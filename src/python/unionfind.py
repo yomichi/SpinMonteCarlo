@@ -38,20 +38,20 @@ class UnionFind:
             level1 += 1
             rt1 = self.table[rt1]
         if level0 < level1 : 
-            self.table[rt0] = self.table[index0] = rt1
+            self.table[rt0] = self.table[index0] = self.table[index1] = rt1
             return rt1
         else:
-            self.table[rt1] = self.table[index1] = rt0
+            self.table[rt1] = self.table[index0] = self.table[index1] = rt0
             return rt0
 
     def clusterize(self):
         N = 0
         self.cluster_IDs = range(self.num())
-        for index in range(self.num()):
+        for index in xrange(self.num()):
             if self.isroot(index):
                 self.cluster_IDs[index] = N
                 N += 1
-        for index in range(self.num()):
+        for index in xrange(self.num()):
             rt = self.root(index)
             self.cluster_IDs[index] = self.cluster_IDs[rt]
         return N
