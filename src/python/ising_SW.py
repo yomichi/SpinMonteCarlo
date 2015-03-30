@@ -1,15 +1,10 @@
 import math
-import numpy
+import numpy as np
 import numpy.random as random
 
-from observable import *
-from unionfind import *
-from square import *
-
-class Cluster:
-    def __init__(self):
-        self.spin = 2*random.randint(2)-1
-        self.mag = 0
+execfile('observable.py')
+execfile('unionfind.py')
+execfile('square.py')
 
 class SW:
     def __init__(self, L, T):
@@ -20,7 +15,7 @@ class SW:
         self.beta = 1.0/T
 
         ## configurations
-        self.spins = numpy.ones(self.num_site(), dtype=numpy.int)
+        self.spins = np.ones(self.num_site(), dtype=np.int)
         self.mag = self.num_site()
         self.ene = -self.num_bond()
 
@@ -43,37 +38,51 @@ class SW:
         self.UF.reset(self.num_site())
 
         num_activated = 0
-        for site in range(self.num_site()):
+
+        for site in xrange(self.num_site()):
             x,y = self.site2coord(site)
             spin = self.spins[site]
-            for neighbor in [self.coord2site((x+1)%self.L,y), self.coord2site(x,(y+1)%self.L)]:
+            for neighbor in self.neighbors(site)[0:2]:
                 if self.spins[neighbor] == spin and random.rand() < self.prob :
                     self.union(site, neighbor)
                     num_activated += 1
-        self.numcluster = self.UF.clusterize()
-        self.clusters = [ Cluster() for ic in range(self.numcluster)]
+        num_clusters = self.UF.clusterize()
+        cl_spins = random.randint(2, size=num_clusters)*2-1
+        cl_sizes = np.zeros(num_clusters)
 
-        for site in range(self.num_site()):
+        for site in xrange(self.num_site()):
             cid = self.cluster_id(site)
-            self.spins[site] = self.clusters[cid].spin
-            self.clusters[cid].mag += 1
+            self.spins[site] = cl_spins[cid]
+            cl_sizes[cid] += 1.0
 
-        m2 = 0.0
-        for cluster in self.clusters:
-            m2 += cluster.mag**2
+        am = np.sum(self.spins)
+        am *= 1.0/self.num_site()
+        am = abs(am)
+        cl_sizes *= 1.0/self.num_site()
+        cl_sizes *= cl_sizes
+        m2 = np.sum(cl_sizes)
+        cs = np.cumsum(cl_sizes)
+        m4 = 12*np.dot(cl_sizes[1:], cs[:-1]) + np.dot(cl_sizes,cl_sizes)
 
         ene = self.num_bond() - (1.0+1.0/math.tanh(self.beta))*num_activated
+        ene /= self.num_bond()
 
-        return m2, ene
+        return am, m2, m4, ene
 
     def run(self, MCS=8192, Thermalization=1024):
-        for mcs in range(Thermalization):
+        for mcs in xrange(Thermalization):
             self.update()
+        absmag = Observable()
         mag2 = Observable()
+        mag4 = Observable()
+        sus = Observable()
         ene = Observable()
-        for mcs in range(MCS):
-            m2, en = self.update()
-            m2 *= self.beta/self.num_site()
+        for mcs in xrange(MCS):
+            am,m2, m4, en = self.update()
+            chi = m2 * self.beta/self.num_site()
+            absmag.add(am)
             mag2.add(m2)
+            mag4.add(m4)
+            sus.add(chi)
             ene.add(en)
-        return mag2, ene
+        return absmag, mag2, mag4, sus, ene
