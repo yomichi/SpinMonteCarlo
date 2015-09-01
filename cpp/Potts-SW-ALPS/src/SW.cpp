@@ -1,6 +1,6 @@
 #include "SW.hpp"
 
-#include "union_find.hpp"
+#include "../../util/union_find.hpp"
 
 #include <cmath>
 #include <boost/math/special_functions/expm1.hpp>

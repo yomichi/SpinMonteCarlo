@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
   const int nbeta_local = offsets[rank+1]-offsets[rank];
 
-  std::vector<potts::Potts<potts::SquareLattice> > potts(nbeta_local, potts::Potts<potts::SquareLattice>(q, L));
+  std::vector<potts::Potts<util::SquareLattice> > potts(nbeta_local, potts::Potts<util::SquareLattice>(q, L));
 
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     rnd(boost::mt19937(static_cast<uint32_t>(std::time(0)+rank*42)), boost::uniform_real<>(0.0, 1.0));

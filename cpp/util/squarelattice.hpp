@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 
-namespace potts{
+namespace util{
 namespace detail{
 inline int modulo(int x, int y) { return x - std::floor(1.0*x/y)*y; }
 } // end of namespace detail
@@ -40,6 +40,6 @@ SquareLattice::SquareLattice(int L):L_(L), N_(L*L)
   }
 }
 
-} // end of namespace potts
+} // end of namespace util
 
 #endif 

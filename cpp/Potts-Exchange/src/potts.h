@@ -1,14 +1,14 @@
 #ifndef POTTS_H
 #define POTTS_H
 
-#include "squarelattice.hpp"
+#include "../../util/squarelattice.hpp"
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 
 namespace potts{
 
-template <class Lattice = SquareLattice>
+template <class Lattice = util::SquareLattice>
 class Potts{
 public:
   Potts(int q, int L):

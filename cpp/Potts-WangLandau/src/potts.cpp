@@ -1,4 +1,4 @@
-#include "squarelattice.hpp"
+#include "../../util/squarelattice.hpp"
 #include "wanglandau.h"
 #include <boost/random.hpp>
 #include <ctime>
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     rnd(boost::mt19937(static_cast<uint32_t>(std::time(0))), boost::uniform_real<>(0.0, 1.0));
 
-  wanglandau::SquareLattice lattice(L);
+  util::SquareLattice lattice(L);
 
   const int nsites = lattice.num_sites();
   const int nbonds = lattice.num_bonds();
