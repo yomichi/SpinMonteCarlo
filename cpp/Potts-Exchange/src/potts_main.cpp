@@ -1,4 +1,5 @@
 #include "potts.h"
+#include <iostream>
 #include <boost/random.hpp>
 #include <ctime>
 #include <mpi.h>
@@ -7,25 +8,6 @@
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
 #include <boost/iterator/counting_iterator.hpp>
-
-namespace {
-template <class T>
-inline int binary_search(std::vector<T> xs, T x){
-  int left = 0;
-  int right = xs.size()-1;
-  while(right - left > 1){
-    int mid = (right+left)/2;
-    if(x == xs[mid]){
-      return mid;
-    }else if(x < xs[mid]){
-      right = mid;
-    }else{
-      left = mid;
-    }
-  }
-  return left;
-}
-}
 
 int main(int argc, char **argv)
 {
@@ -56,6 +38,8 @@ int main(int argc, char **argv)
 
   if( vm.count("help") ){
     std::cout << opt << std::endl;
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
     return 0;
   }
 
@@ -92,13 +76,12 @@ int main(int argc, char **argv)
   boost::variate_generator<boost::mt19937, boost::uniform_real<> >
     rnd(boost::mt19937(static_cast<uint32_t>(std::time(0)+rank*42)), boost::uniform_real<>(0.0, 1.0));
 
-  for(int mcs = 0; mcs < therm+mcs; ++mcs){
+  for(int mcs = 0; mcs < therm+MCS; ++mcs){
     for(int lm=0; lm < interval; ++lm){
       for(int i=0; i<nbeta_local; ++i){
         potts[i].update(betas[offset+i], rnd);
       }
     }
-    std::vector<double> enes_local(nbeta, 0.0);
     for(int i=0; i<nbeta_local; ++i){
       enes_local[offset+i] = potts[i].ene();
     }
@@ -119,6 +102,8 @@ int main(int argc, char **argv)
     }
     MPI_Bcast(&betas[0], nbeta, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
+
+  MPI_Finalize();
 
   return 0;
 }
