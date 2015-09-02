@@ -1,28 +1,39 @@
 #include "potts.h"
+#include "ising.h"
+#include "../../util/observable.hpp"
+#include "../../util/squarelattice.hpp"
 #include <iostream>
 #include <boost/random.hpp>
 #include <ctime>
 #include <mpi.h>
+#include <boost/shared_ptr.hpp>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
-#include <boost/iterator/counting_iterator.hpp>
 
 int main(int argc, char **argv)
 {
+  typedef util::SquareLattice Lattice;
+  typedef boost::variate_generator<boost::mt19937, boost::uniform_real<> > RNG01;
+  typedef boost::shared_ptr<potts::Model<Lattice, RNG01> > ModelPtr;
+
   MPI_Init(&argc, &argv);
 
   int nprocs, rank;
   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  RNG01 rnd(boost::mt19937(static_cast<uint32_t>(std::time(0)+rank*42)), boost::uniform_real<>(0.0, 1.0));
+
   using namespace boost;
   using namespace boost::program_options;
   options_description opt("options");
   opt.add_options()
-    ("help,h", "show this message")
+    ("help", "show this message")
+    ("Ising", "simulate Ising model")
     ("q,q", value<int>()->default_value(2), "number of state of a spin")
+    ("h,h", value<double>()->default_value(0.0), "magnetic field")
     ("L,L", value<int>()->default_value(10), "length of lattice")
     ("beta-min", value<double>()->default_value(0.1), "minimum beta")
     ("beta-max", value<double>()->default_value(1.0), "maximum beta")
@@ -43,8 +54,11 @@ int main(int argc, char **argv)
     return 0;
   }
 
+  const bool bIsing = vm.count("Ising");
+
   const int q = vm["q"].as<int>();
   const int L = vm["L"].as<int>();
+  const double h = vm["h"].as<double>();
   const double bmin = vm["beta-min"].as<double>();
   const double bmax = vm["beta-max"].as<double>();
   const int nbeta = vm["beta-num"].as<int>();
@@ -52,12 +66,20 @@ int main(int argc, char **argv)
   const int MCS = vm["mcs"].as<int>();
   const int interval = vm["interval"].as<int>();
 
+  const double dbeta = (bmax-bmin)/(nbeta-1);
+
+  // the i-th worker runs under beta = betas[i]
+  // the beta_index[i]-th worker runs under the i-th lowest beta (bmin + i*dbeta)
+  // in other words, the value of the i-th lowest beta is betas[beta_index[i]]
   std::vector<double> betas(nbeta);
+  std::vector<int> beta_index(nbeta);
+  // inv_beta_index is the inverse of beta_index
+  std::vector<int> inv_beta_index(nbeta);
   for(int i=0; i<nbeta; ++i){
-    betas[i] = bmin + i*(bmax-bmin)/(nbeta-1);
+    betas[i] = bmin + i*dbeta;
+    beta_index[i] = i;
+    inv_beta_index[i] = i;
   }
-  std::vector<int> beta_index(boost::counting_iterator<int>(0),
-                              boost::counting_iterator<int>(nbeta));
 
   std::vector<int> offsets(nprocs+1,0);
   for(int i=0; i<nbeta%nprocs; ++i){
@@ -71,25 +93,43 @@ int main(int argc, char **argv)
 
   const int nbeta_local = offsets[rank+1]-offsets[rank];
 
-  std::vector<potts::Potts<util::SquareLattice> > potts(nbeta_local, potts::Potts<util::SquareLattice>(q, L));
+  std::vector<ModelPtr> models;
+  if(bIsing){
+    for(int i=0; i<nbeta_local; ++i){
+      models.push_back(ModelPtr(new potts::Ising<Lattice,RNG01>(h,L)));
+    }
+  }else{
+    for(int i=0; i<nbeta_local; ++i){
+      models.push_back(ModelPtr(new potts::Potts<Lattice,RNG01>(q,h,L)));
+    }
+  }
 
-  boost::variate_generator<boost::mt19937, boost::uniform_real<> >
-    rnd(boost::mt19937(static_cast<uint32_t>(std::time(0)+rank*42)), boost::uniform_real<>(0.0, 1.0));
+  std::vector<util::Observable> obs_ene(nbeta);
+  std::vector<util::Observable> obs_mag(nbeta);
 
   for(int mcs = 0; mcs < therm+MCS; ++mcs){
     for(int lm=0; lm < interval; ++lm){
       for(int i=0; i<nbeta_local; ++i){
-        potts[i].update(betas[offset+i], rnd);
+        models[i]->update(betas[offset+i], rnd);
       }
     }
+    std::vector<double> enes_local(nbeta);
+    std::vector<double> mags_local(nbeta);
     for(int i=0; i<nbeta_local; ++i){
-      enes_local[offset+i] = potts[i].ene();
+      enes_local[offset+i] = models[i]->ene();
+      mags_local[offset+i] = models[i]->mag();
     }
-    std::vector<double> enes;
-    if(rank==0) enes.resize(nbeta);
+    std::vector<double> enes(rank==0?nbeta:0);
+    std::vector<double> mags(rank==0?nbeta:0);
     MPI_Reduce(&enes_local[0], &enes[0], nbeta, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&mags_local[0], &mags[0], nbeta, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if(rank == 0){
+      for(int i=0; i<nbeta; ++i){
+        obs_ene[i] << enes[beta_index[i]];
+        obs_mag[i] << mags[beta_index[i]];
+      }
+
       for(int i=nbeta-1; i>0; --i){ // from low-temperature to high-T
         const int ihigh = beta_index[i];
         const int ilow = beta_index[i-1];
@@ -97,12 +137,32 @@ int main(int argc, char **argv)
         if(rnd() < p){
           std::swap(betas[ihigh], betas[ilow]);
           std::swap(beta_index[i], beta_index[i-1]);
+          std::swap(inv_beta_index[beta_index[i]], inv_beta_index[beta_index[i-1]]);
         }
       }
     }
     MPI_Bcast(&betas[0], nbeta, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    if(rank==0){
+      if(mcs == therm){
+        for(int i=0; i<nbeta; ++i){
+          obs_ene[i].reset();
+          obs_mag[i].reset();
+        }
+      }
+      std::clog << "mcs : " << mcs << "/" << MCS+therm << " done." << std::endl;
+    }
   }
 
+  if(rank==0){
+    for(int i=0; i<nbeta; ++i){
+      std::cout << betas[beta_index[i]]
+         << " " << obs_ene[i].mean() << " " << obs_ene[i].error()
+         << " " << obs_mag[i].mean() << " " << obs_mag[i].error()
+         << std::endl;
+    }
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 
   return 0;
