@@ -41,6 +41,7 @@ int main(int argc, char **argv)
     ("thermalization", value<int>()->default_value(8), "number of exchange to thermalize")
     ("mcs", value<int>()->default_value(64), "number of exchange to measure")
     ("interval,i", value<int>()->default_value(1024), "temperature exchange interval")
+    ("no-exchange", "switch off temperature exchange")
     ;
 
   variables_map vm;
@@ -55,6 +56,7 @@ int main(int argc, char **argv)
   }
 
   const bool bIsing = vm.count("Ising");
+  const bool noEx = vm.count("no-exchange");
 
   const int q = vm["q"].as<int>();
   const int L = vm["L"].as<int>();
@@ -124,32 +126,42 @@ int main(int argc, char **argv)
     MPI_Reduce(&enes_local[0], &enes[0], nbeta, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(&mags_local[0], &mags[0], nbeta, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    if(rank == 0){
-      for(int i=0; i<nbeta; ++i){
-        obs_ene[i] << enes[beta_index[i]];
-        obs_mag[i] << mags[beta_index[i]];
-      }
-
-      for(int i=nbeta-1; i>0; --i){ // from low-temperature to high-T
-        const int ihigh = beta_index[i];
-        const int ilow = beta_index[i-1];
-        const double p = std::exp( (betas[ihigh] - betas[ilow])*(enes[ihigh]-enes[ilow]));
-        if(rnd() < p){
-          std::swap(betas[ihigh], betas[ilow]);
-          std::swap(beta_index[i], beta_index[i-1]);
-          std::swap(inv_beta_index[beta_index[i]], inv_beta_index[beta_index[i-1]]);
-        }
-      }
-    }
-    MPI_Bcast(&betas[0], nbeta, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    if(rank==0){
-      if(mcs == therm){
+    if(noEx){
+      if(rank == 0){
         for(int i=0; i<nbeta; ++i){
-          obs_ene[i].reset();
-          obs_mag[i].reset();
+          obs_ene[i] << enes[beta_index[i]];
+          obs_mag[i] << mags[beta_index[i]];
+        }
+        std::clog << "mcs : " << mcs+1 << "/" << MCS+therm << " done." << std::endl;
+      }
+    }else{
+      if(rank == 0){
+        for(int i=0; i<nbeta; ++i){
+          obs_ene[i] << enes[beta_index[i]];
+          obs_mag[i] << mags[beta_index[i]];
+        }
+
+        for(int i=nbeta-1; i>0; --i){ // from low-temperature to high-T
+          const int ihigh = beta_index[i];
+          const int ilow = beta_index[i-1];
+          const double p = std::exp( (betas[ihigh] - betas[ilow])*(enes[ihigh]-enes[ilow]));
+          if(rnd() < p){
+            std::swap(betas[ihigh], betas[ilow]);
+            std::swap(beta_index[i], beta_index[i-1]);
+            std::swap(inv_beta_index[beta_index[i]], inv_beta_index[beta_index[i-1]]);
+          }
         }
       }
-      std::clog << "mcs : " << mcs << "/" << MCS+therm << " done." << std::endl;
+      MPI_Bcast(&betas[0], nbeta, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+      if(rank==0){
+        if(mcs == therm){
+          for(int i=0; i<nbeta; ++i){
+            obs_ene[i].reset();
+            obs_mag[i].reset();
+          }
+        }
+        std::clog << "mcs : " << mcs+1 << "/" << MCS+therm << " done." << std::endl;
+      }
     }
   }
 
