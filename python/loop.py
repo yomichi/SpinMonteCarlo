@@ -18,10 +18,11 @@ class Looper:
     """
     Loop algorithm for S=1/2 antiferromagnetic Heisenberg periodic chain with length L at temperature T
     """
-    def __init__(self, L, T, J=1.0):
+    def __init__(self, L, T, J=1.0, periodic_boundary = True):
 
         ## parameter
         self.L = L
+        self.nbonds = L if periodic_boundary else L-1
         self.beta = 1.0/T
         self.J = J  ## coupling constant
 
@@ -33,7 +34,7 @@ class Looper:
         self.operators = []
         self.UF = UnionFind(L)
         self.numcluster = 0
-        self.bj2inv = (2.0*T)/(L*J)
+        self.bj2inv = (2.0*T)/(self.nbonds*J)
 
     def leftsite(self, bond):
         return bond
@@ -70,7 +71,7 @@ class Looper:
             if oi == len(self.operators) or t < self.operators[oi].time :
                 # insert new graph element at t
 
-                b = random.randint(self.L)
+                b = random.randint(self.nbonds)
                 lsite, rsite = self.leftsite(b), self.rightsite(b)
                 if self.spins[lsite] != self.spins[rsite] :
                     newop = GraphElement(bond = b, time = t)
@@ -130,7 +131,7 @@ class Looper:
         l2 = lens.dot(lens)
         m2 *= self.beta/self.L
         l2 *= 0.25*self.beta/self.L
-        ene = 0.25*self.L*self.J - len(self.operators)/self.beta
+        ene = 0.25*self.nbonds*self.J - len(self.operators)/self.beta
         return m2, l2, ene
 
     def run(self, MCS=8192, Thermalization=1024):
