@@ -27,7 +27,7 @@ class MyFrame(wx.Frame):
     self.timer.Stop()
 
     self.L = 16
-    self.T = 1.0
+    self.T = 0.5
     self.loop = loop.Looper(L=self.L, T=self.T, periodic_boundary = False)
     self.initUI()
 
@@ -37,10 +37,10 @@ class MyFrame(wx.Frame):
     update_button.Bind(wx.EVT_BUTTON, self.OnMCUpdate)
 
     self.T_txt = wx.StaticText(self, label="T = {}".format(self.T))
-    Tslider = wx.Slider(self, value = 100, style=wx.SL_HORIZONTAL)
+    Tslider = wx.Slider(self, value = 50, style=wx.SL_HORIZONTAL)
     Tslider.Bind(wx.EVT_SLIDER, self.OnTempSlider)
     Tslider.SetMin(1)
-    Tslider.SetMax(1000)
+    Tslider.SetMax(100)
 
     L_txt = wx.StaticText(self, label = "L = ")
 
