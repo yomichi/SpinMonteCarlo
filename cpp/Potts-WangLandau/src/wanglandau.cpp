@@ -4,6 +4,7 @@
 #include <fstream>
 #include <boost/lexical_cast.hpp>
 #include <algorithm>
+#include <iomanip>
 
 namespace wanglandau{
 
@@ -71,6 +72,7 @@ void WangLandau::update(bool verbose=false)
     filename += boost::lexical_cast<std::string>(stage_);
     filename += ".dat";
     std::ofstream ofs(filename.c_str());
+    ofs << std::setprecision(15);
     ofs << "# $1 : index" << std::endl;
     ofs << "# $2 : log of DoS" << std::endl;
     ofs << "# $3 : population" << std::endl;
