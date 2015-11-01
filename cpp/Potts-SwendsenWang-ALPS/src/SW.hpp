@@ -3,11 +3,15 @@
 
 #include <alps/parapack/worker.h>
 
+#include "../../util/logging.hpp"
+
 namespace potts{
 
 class Worker : public alps::parapack::lattice_mc_worker<> {
 private:
   typedef alps::parapack::lattice_mc_worker<> SuperClass;
+
+  util::Logger logger_;
 
   /*
    * parameters

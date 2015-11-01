@@ -1,6 +1,7 @@
 #include "SW.hpp"
 
 #include "../../util/union_find.hpp"
+#include "../../util/pow.hpp"
 
 #include <cmath>
 #include <boost/math/special_functions/expm1.hpp>
@@ -11,6 +12,11 @@
 namespace potts{
 
 Worker::Worker(alps::Parameters const& params):
+  logger_(std::string("log_")
+          + boost::lexical_cast<std::string>(params["TASK_ID"])
+          + "_"
+          + boost::lexical_cast<std::string>(params["CLONE_ID"])
+          ),
   SuperClass(params),
   mcs_(params),
   T_(evaluate("T", params)),
@@ -68,10 +74,11 @@ void Worker::init_observables(alps::Parameters const&, alps::ObservableSet& obs)
 void Worker::run(alps::ObservableSet& obs)
 {
   boost::timer::cpu_timer tm;
+  SCOPED_LOGGING(logger_, "Worker::run()");
 
   ++mcs_;
 
-  // make clusters
+  LOGGING(logger_, "clusterize");
 
   int activated = 0;
   std::vector<union_find::Node> nodes(nsites_);
@@ -83,48 +90,44 @@ void Worker::run(alps::ObservableSet& obs)
       ++activated;
     }
   }
+  const int nc = union_find::clusterize(nodes);
 
-  // flip spins
+  LOGGING(logger_, "flip spins");
 
   double ma = 0.0;
-  std::vector<int> cluster_size2;
-  std::vector<int> cluster_spin;
-  int id = 0;
+  std::vector<int> cluster_size(nc);
+  std::vector<int> cluster_spin(nc);
+  for(int cl=0; cl<nc; ++cl){
+    cluster_spin[cl] = q_ * random_01();
+  }
   for(int site=0; site<nsites_; ++site){
-    int ri = union_find::root_index(nodes, site);
-    union_find::Node &root = nodes[ri];
-    if(root.id == -1){
-      root.id = id++;
-      cluster_size2.push_back(root.size*root.size);
-      cluster_spin.push_back(q_ * random_01());
-    }
-    spins_[site] = cluster_spin[root.id];
-    ma += spins_[site] == 0 ? 1.0 : -negspin_;
+    const int id = union_find::cluster_id(nodes, site);
+    ++cluster_size[id];
+    spins_[site] = cluster_spin[id];
+    ma += cluster_spin[id];
   }
 
   if(!is_thermalized()){
     return;
   }
 
-  // measure 
+  LOGGING(logger_, "measure");
 
-  const int nc = cluster_size2.size();
+  const double invV = 1.0 / nsites_;
   double m2 = 0.0;
   double m4 = 0.0;
   for(int ci=0; ci < nc; ++ci){
-    m4 += m4_coeff_ * cluster_size2[ci] * cluster_size2[ci];
-    m4 += 6 * cluster_size2[ci] * m2;
-    m2 += m2_coeff_ * cluster_size2[ci];
+    const double cl2 = util::pow2(cluster_size[ci] * invV);
+    m4 += m4_coeff_ * cl2*cl2;
+    m4 += 6 * cl2 * m2;
+    m2 += m2_coeff_ * cl2;
   }
-  const double V2 = nsites_ * nsites_;
-  m2 /= V2;
-  m4 /= (V2*V2);
 
   double ene = ene_const_ - ene_coeff_ * activated;
 
   obs["Magnetization^2"] << m2;
   obs["Magnetization^4"] << m4;
-  obs["|Magnetization|"] << std::abs(ma) / nsites_;
+  obs["|Magnetization|"] << std::abs(ma) * invV;
   obs["Susceptibility"] << m2 * nsites_ *  beta_;
   obs["Number of Sites"] << 1.0 * nsites_;
   obs["Energy"] << ene;

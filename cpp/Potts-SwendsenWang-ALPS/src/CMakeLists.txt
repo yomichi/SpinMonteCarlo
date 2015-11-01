@@ -8,3 +8,8 @@ include(${ALPS_USE_FILE})
 
 add_executable(potts potts.cpp SW.cpp)
 target_link_libraries(potts ${ALPS_LIBRARIES})
+
+if(${ENABLE_LOGGING})
+  set_property(TARGET potts APPEND PROPERTY COMPILE_DEFINITIONS ENABLE_LOGGING)
+endif()
+
