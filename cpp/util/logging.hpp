@@ -33,11 +33,17 @@
  // and the program will stop soon.
  logging_assert(logger, 1 == 0);
 
+
+ // VERBOSE is the almost same as LOGGING,
+ // but this prints only when ENABLE_LOGGING_VERBOSE is defined
+ VERBOSE(logger, "verbose output");
+ { SCOPED_VERBOSE(logger, "verbose output"); }
+
  * end of usage
  */
 
-#include "detail/logging_macro.hpp"
-#include "detail/logging_class.hpp"
-#include "detail/logging_STL.hpp"
+#include "logging/macro.hpp"
+#include "logging/core.hpp"
+#include "logging/STL.hpp"
 
 #endif // LOGGING_HPP

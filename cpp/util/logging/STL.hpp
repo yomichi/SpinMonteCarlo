@@ -1,5 +1,5 @@
-#ifndef DETAIL_LOGGING_STL_HPP
-#define DETAIL_LOGGING_STL_HPP
+#ifndef LOGGING_STL_HPP
+#define LOGGING_STL_HPP
 
 #ifdef ENABLE_LOGGING
 
@@ -39,4 +39,4 @@ STL_CONTAINER_ONE(std::set);
 } // end of namespace util
 
 #endif // ENABLE_LOGGING
-#endif // DETAIL_LOGGING_STL_HPP
+#endif // LOGGING_STL_HPP

@@ -1,11 +1,13 @@
-#ifndef DETAIL_LOGGING_CLASS_HPP
-#define DETAIL_LOGGING_CLASS_HPP
+#ifndef LOGGING_CORE_HPP
+#define LOGGING_CORE_HPP
+
+#include <string>
+#include <sstream>
 
 #ifdef ENABLE_LOGGING
 
 #include <iostream>
 #include <fstream>
-#include <string>
 #include <boost/shared_ptr.hpp>
 
 namespace util{
@@ -15,7 +17,15 @@ private:
   std::string filename;
   boost::shared_ptr<std::ofstream> ofs;
 public:
+  explicit Logger(const char* logger_id)
+  {
+    init(std::string(logger_id));
+  }
   explicit Logger(std::string const& logger_id)
+  {
+    init(logger_id);
+  }
+  void init(std::string const& logger_id)
   {
     filename = logger_id + ".log";
     ofs = boost::shared_ptr<std::ofstream>(new std::ofstream(filename.c_str()));
@@ -80,9 +90,11 @@ public:
 namespace util{
 class Logger{
 public:
+  explicit Logger(const char*){}
   explicit Logger(std::string const&){}
+  void reset(){}
 };
 } // end of namespace util
 #endif // ENABLE_LOGGING
 
-#endif // DETAIL_LOGGING_CLASS_HPP
+#endif // LOGGING_CORE_HPP
