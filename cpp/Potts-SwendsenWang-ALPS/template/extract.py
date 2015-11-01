@@ -15,9 +15,9 @@ names = { 'Time' : 'time',
           'Number of Clusters' : 'cluster',
           }
 
-xnames   = [ 'L', ]
-foreachs = [ ['T'], ]
-fe_types = [ [np.float], ]
+xnames   = [ 'beta', ]
+foreachs = [ ['L'], ]
+fe_types = [ [np.int], ]
 
 def extract(data, xname, names, foreach, fe_types):
   if np.isscalar(foreach):

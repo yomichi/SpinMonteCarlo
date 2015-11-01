@@ -2,4 +2,4 @@
 
 rm -f params.*
 python init_param.py
-mpiexec ../build/potts
+../build/potts params.in.xml
