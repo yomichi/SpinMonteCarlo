@@ -6,9 +6,9 @@
 namespace union_find{
 struct Node{
   int parent;
-  int size;
+  int weight;
   int id;
-  Node():parent(-1), size(1), id(-1){}
+  Node():parent(-1), weight(1), id(-1){}
   bool isroot() const{ return parent == -1;}
 };
 
@@ -32,11 +32,7 @@ inline Node root(Nodes const& nodes, int index)
 
 inline int cluster_id(Nodes const& nodes, int index)
 {
-  return root(nodes, index).id;
-}
-inline int cluster_size(Nodes const& nodes, int index)
-{
-  return root(nodes, index).size;
+  return nodes[index].id;
 }
 
 inline int unify(Nodes& nodes, int i0, int i1)
@@ -45,9 +41,30 @@ inline int unify(Nodes& nodes, int i0, int i1)
   int r1 = root_index(nodes, i1);
   if(r0 == r1) return r0;
 
+  if(nodes[r0].weight < nodes[r1].weight){
+    std::swap(r0, r1);
+  }
   nodes[r1].parent = r0;
-  nodes[r0].size += nodes[r1].size;
+  if(nodes[r1].weight == nodes[r0].weight){
+    ++nodes[r0].weight;
+  }
   return r0;
+}
+
+inline int clusterize(Nodes& nodes)
+{
+  const int nnodes = nodes.size();
+  int nc = 0;
+  for(int i=0; i<nnodes; ++i){
+    if(isroot(nodes, i)){
+      nodes[i].id = nc;
+      ++nc;
+    }
+  }
+  for(int i=0; i<nnodes; ++i){
+    nodes[i].id = root(nodes,i).id;
+  }
+  return nc;
 }
 
 }
