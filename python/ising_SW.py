@@ -31,7 +31,7 @@ class SW:
   def coord2site(self, x,y) : return self.lattice.coord2site(x,y)
 
   ## delegate to UnionFind
-  def union(self, lsite, rsite) : return self.UF.union(lsite, rsite)
+  def unify(self, lsite, rsite) : return self.UF.unify(lsite, rsite)
   def cluster_id(self, site) : return self.UF.cluster_id(site)
 
   def update(self):
@@ -44,7 +44,7 @@ class SW:
       spin = self.spins[site]
       for neighbor in self.neighbors(site)[0:2]:
         if self.spins[neighbor] == spin and random.rand() < self.prob :
-          self.union(site, neighbor)
+          self.unify(site, neighbor)
           num_activated += 1
     num_clusters = self.UF.clusterize()
     cl_spins = random.randint(2, size=num_clusters)*2-1

@@ -44,7 +44,7 @@ class Looper:
 
   # delegete to UnionFind
   def add(self, index): return self.UF.add(index)
-  def union(self, index0, index1): return self.UF.union(index0, index1)
+  def unify(self, index0, index1): return self.UF.unify(index0, index1)
   def clusterize(self): return self.UF.clusterize()
   def cluster_id(self, index): return self.UF.cluster_id(index)
 
@@ -54,15 +54,15 @@ class Looper:
 
     # diagonal update -- scattering graph elements which connect anti-parallel spins
     #
-    # |  |     |  |
+    # |  |       |  |
     # |  |  <->  ----
-    # |  |     ----
-    # |  |     |  |
+    # |  |       ----
+    # |  |       |  |
     #
     # weight of the right graph is
     # 
     # w = \beta J / 2 dt  for anti-parallel spins
-    #   0         for parallel spins
+    #           0         for parallel spins
     #
 
     oi = 0
@@ -88,7 +88,7 @@ class Looper:
           continue
       b = self.operators[oi].bond
       lsite, rsite = self.leftsite(b), self.rightsite(b)
-      bottom = self.UF.union(nodes[lsite], nodes[rsite])
+      bottom = self.UF.unify(nodes[lsite], nodes[rsite])
       top = self.UF.add()
       self.operators[oi].bottom = bottom
       self.operators[oi].top = nodes[lsite] = nodes[rsite] = top
@@ -100,7 +100,7 @@ class Looper:
     
     # boundary condition along time is periodic
     for site in xrange(self.L):
-      self.UF.union(site, nodes[site])
+      self.UF.unify(site, nodes[site])
     
     self.numcluster = self.clusterize()
     flips = random.randint(2, size = self.numcluster)

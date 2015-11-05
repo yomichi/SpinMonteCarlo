@@ -1,48 +1,46 @@
 class UnionFind:
   def __init__(self, num=0):
-    self.table = range(num)
+    self.parents = range(num)
+    self.weights = [1]*num
     self.cluster_IDs = None
 
   def reset(self, num=0):
-    self.table = range(num)
+    self.parents = range(num)
+    self.weights = [1] * num
     self.cluster_IDs = None
     return self
 
   def num(self):
-    return len(self.table)
+    return len(self.parents)
   
   def isroot(self, index):
-    return self.table[index] == index
+    return self.parents[index] == index
 
   def root(self, index):
     while not(self.isroot(index)):
-      index = self.table[index]
+      index = self.parents[index]
     return index
 
   def add(self):
     self.cluster_IDs = None
     N = self.num()
-    self.table.append(N)
+    self.parents.append(N)
+    self.weights.append(1)
     return N
 
-  def union(self, index0, index1):
+  def unify(self, index0, index1):
     if index0 == index1 :
       return index0
     self.cluster_IDs = None
-    level0, level1 = 0,0
-    rt0,rt1 = index0, index1
-    while not(self.isroot(rt0)):
-      level0 += 1
-      rt0 = self.table[rt0]
-    while not(self.isroot(rt1)):
-      level1 += 1
-      rt1 = self.table[rt1]
-    if level0 < level1 : 
-      self.table[rt0] = self.table[index0] = self.table[index1] = rt1
-      return rt1
-    else:
-      self.table[rt1] = self.table[index0] = self.table[index1] = rt0
-      return rt0
+    rt0,rt1 = self.root(index0), self.root(index1)
+    w0,w1 = self.weights[rt0], self.weights[rt1]
+    if w0 < w1 :
+      rt0,rt1 = rt1,rt0
+
+    self.parents[rt1] = rt0
+    if w0 == w1:
+      self.weights[rt0] += 1
+    return rt0
 
   def clusterize(self):
     N = 0
