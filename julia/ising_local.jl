@@ -1,65 +1,83 @@
+include("SpinMonteCarlo.jl")
 using SpinMonteCarlo
 
-function ising_localupdate(lat::Lattice, T::Float64, Sweeps::Int, Thermalization::Int)
-  nsites = num_sites(lat)
-  nbonds = num_bonds(lat)
-  spins = ones(Int,nsites)
-  mag = nsites
-  ene = -nbonds
+square(x) = x*x
 
-  beta = 1.0/T
+type Ising
+  lat :: Lattice
+  spins :: Vector{Int}
+  T :: Float64
+  beta :: Float64
+  h :: Float64
+  mag :: Float64
+  ene :: Float64
 
-  function update()
+  function Ising(L, T, h, initial::Symbol=:up)
+    @show T, h
+    lat = square_lattice(L)
+    nsites = num_sites(lat)
+    nbonds = num_bonds(lat)
+    spins = (initial == :up ? ones(Int,nsites)
+                           : (initial == :down ? -ones(Int, nsites)
+                                               : rand([1,-1], nsites)))
+
+    mag = sum(spins)
+    ene = -mag*h
     for site in 1:nsites
-      de = 2spins[site] * sum([spins[s] for s in neighbors(lat,site)])
-      p = exp(-beta*de)
-      if rand()<p
-        mag -= 2spins[site]
-        ene += de
-        spins[site] *= -1
+      s = spins[site]
+      for site2 in neighbors(lat, site)
+        s2 = spins[site2]
+        ene -= (s == s2 ? 1 : -1)
       end
     end
+    new(lat, spins, T, 1.0/T, h, mag, ene)
   end
+end
+
+function update!(model::Ising)
+  nsites = num_sites(model.lat)
+  for site in 1:nsites
+    de = 2model.spins[site] * (sum([model.spins[s] for s in neighbors(model.lat,site)]) + model.h)
+    p = exp(-model.beta*de)
+    if rand()<p
+      model.mag -= 2model.spins[site]
+      model.ene += de
+      model.spins[site] *= -1
+    end
+  end
+end
+
+function measure!(obs, model)
+  nsites = num_sites(model.lat)
+  nbonds = num_bonds(model.lat)
+  m = model.mag/nsites
+  en = model.ene/nbonds
+  add!(obs["Magnetization"], m)
+  add!(obs["Magnetization^2"], square(m))
+  add!(obs["Magnetization^4"], square(square(m)))
+  add!(obs["Energy"], en)
+  add!(obs["Energy^2"], square(en))
+end
+
+function ising_localupdate(L::Int, T::Float64, h::Float64, Sweeps::Int, Thermalization::Int; initial::Symbol = :up)
+
+  model = Ising(L, T, h, initial)
 
   obs = ObservableSet()
-  add(obs,"Magnetization")
-  add(obs,"Magnetization^2")
-  add(obs,"Magnetization^4")
-  add(obs,"Energy")
-  add(obs,"Energy^2")
-
-  function measure()
-    m = convert(Float64,  mag/nsites)
-    en = convert(Float64, ene/nbonds)
-    add(obs["Magnetization"], m)
-    add(obs["Magnetization^2"], square(m))
-    add(obs["Magnetization^4"], square(square(m)))
-    add(obs["Energy"], en)
-    add(obs["Energy^2"], square(en))
-  end
+  add!(obs,"Magnetization")
+  add!(obs,"Magnetization^2")
+  add!(obs,"Magnetization^4")
+  add!(obs,"Energy")
+  add!(obs,"Energy^2")
 
   for mcs in 1:Thermalization
-    update()
+    update!(model)
   end
   for mcs in 1:Sweeps
-    update()
-    measure()
+    update!(model)
+    measure!(obs, model)
   end
 
   return obs
-end
-
-L = 16
-lat = square_lattice(L)
-Sweeps = 8192
-Thermalization = Sweeps>>3
-
-for T in 2.0:0.1:2.4
-  observables = ising_localupdate(lat, T, Sweeps, Thermalization)
-  for obs in observables
-    open("$(obs[1])_$L.dat", "a") do os
-      write(os, "$T $(mean(obs[2])) $(error(obs[2]))\n")
-    end
-  end
 end
 

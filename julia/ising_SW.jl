@@ -1,11 +1,33 @@
-require("observable.jl")
-require("lattice.jl")
+include("observable.jl")
+include("lattice.jl")
+include("union_find.jl")
 
-using UnionFinds
-
-type cluster
+type Cluster
   spin :: Int
   size :: Int
+end
+
+function update!(spins::AbstractArray{Int}, p::Real)
+  uf = UnionFind(nsites)
+  for bond in 1:nbonds
+    s1,s2 = source(lat, bond), target(lat, bond)
+    if spins[s1] == spins[s2] && rand() < p
+      unify(uf, s1,s2)
+    end
+  end
+  nc = clusterize!(uf)
+  clusters = Vector{Cluster}(nc)
+  for cl in clusters
+    cl.size = 0
+    cl.spin = rand([1,-1])
+  end
+  for site in 1:nsites
+    id = cluster_id(uf, site)
+    cl = clusters[id]
+    spins[site] = cl.spin
+    cl.size += 1
+  end
+  return clusters
 end
 
 function ising_SW(lat::Lattice, T::Float64, Sweeps::Int, Thermalization::Int)
@@ -15,27 +37,6 @@ function ising_SW(lat::Lattice, T::Float64, Sweeps::Int, Thermalization::Int)
 
   p = 1.0-exp(-2.0/T)
 
-  function update()
-    uf = UnionFind(nsites)
-    for bond in 1:nbonds
-      s1,s2 = source(lat, bond), target(lat, bond)
-      if spins[s1] == spins[s2] && rand() < p
-        unify(uf, s1,s2)
-      end
-    end
-    clusters = Dict{Int,cluster}()
-    for site in 1:nsites
-      r = root(uf,site)
-      if !has(clusters,r)
-        clusters[r] = cluster(2(rand(0:1))-1, 0)
-      end
-      cl = clusters[r]
-      spins[site] = cl.spin
-      cl.size += 1
-    end
-    return (Float64)[ square(cl[2].size/nsites) for cl in clusters]
-  end
-
   obs = ObservableSet()
   add(obs,"Magnetization")
   add(obs,"Magnetization^2")
@@ -43,17 +44,15 @@ function ising_SW(lat::Lattice, T::Float64, Sweeps::Int, Thermalization::Int)
   add(obs,"Energy")
   add(obs,"Energy^2")
 
-  function measure(ar::Vector)
+  function measure(clusters)
     m2 = 0.0
     m4 = 0.0
 
-    for i in 1:length(ar)
-      mi = ar[i]
-      m2 += mi
+    for i in 1:length(clusters)
+      c2 = square(clusters[i].size)
       m4 += square(mi)
-      for j in 1:i-1
-        m4 += 6.0*mi*ar[j]
-      end
+      m4 += 6.0 * c2 * m2
+      m2 += mi
     end
 
     add(obs["Magnetization"], 0.0)

@@ -1,6 +1,5 @@
-export Lattice
-export dim,size,num_sites,num_bonds,neighbors,source,target
-export chain_lattice,square_lattice
+export Lattice, dim, size, num_sites, num_bonds, neighbors, source, target
+export chain_lattice, square_lattice
 
 type Lattice
   dim :: Int

@@ -1,37 +1,37 @@
-export UnionFind, is_root, root, unify, new_node, num_nodes, num_clusters, reset
-
 type UnionFind
   parents :: Vector{Int}
+  weights :: Vector{Int}
+  ids :: Vector{Int}
   nnodes :: Int
   nclusters :: Int
-  UnionFind() = new(zeros(Int,0),0,0)
-  UnionFind(n::Int) = new(reshape(1:n,n),n,n)
+  UnionFind(n::Int=0) = new(collect(1:n),ones(Int,n),zeros(Int,n),n,n)
 end
 
 num_nodes(u::UnionFind) = u.nnodes
 num_clusters(u::UnionFind) = u.nclusters
 
-is_root(u::UnionFind, n::Int) = u.parents[n] == n
+is_root(u::UnionFind, n::Integer) = u.parents[n] == n
 
-function root_and_weight(u::UnionFind, n::Int)
-  r,w = n,0
+function root_and_weight(u::UnionFind, n::Integer)
+  r = n
   while !is_root(u,r)
     r = u.parents[r]
-    w += 1
   end
-  u.parents[n] = r
-  return r,w
+  return r,u.weights[r]
 end
 
-root(u::UnionFind, n::Int) = root_and_weight(u,n)[1]
+root(u::UnionFind, n::Integer) = root_and_weight(u,n)[1]
 
-function unify(u::UnionFind, n1::Int, n2::Int)
+function unify!(u::UnionFind, n1::Integer, n2::Integer)
   r1,w1 = root_and_weight(u,n1)
   r2,w2 = root_and_weight(u,n2)
   if r1 != r2
     u.nclusters -= 1
     if w1<w2
       u.parents[r1] = r2
+    elseif w1 == w2
+      u.parents[r2] = r1
+      u.weights[r1]+=1
     else
       u.parents[r2] = r1
     end
@@ -40,9 +40,26 @@ function unify(u::UnionFind, n1::Int, n2::Int)
   end
 end
 
-function new_node(u::UnionFind) 
+function add_node!(u::UnionFind) 
   push!(u.parents,length(u.parents)+1)
+  push!(u.weights,1)
   u.nclusters += 1
   u.nnodes += 1
 end
+
+function clusterize!(u::UnionFind)
+  u.nclusters = 0
+  for i in 1:length(u.parents)
+    if is_root(u,i)
+      u.nclusters += 1
+      u.ids[i] = u.nclusters
+    end
+  end
+  for i in 1:length(u.parents)
+    u.ids[i] = u.ids[root(u,i)]
+  end
+  return u.nclusters
+end
+
+cluster_id(u::UnionFind, i::Integer) = u.ids[i]
 
