@@ -1,88 +1,88 @@
-include("observable.jl")
 include("lattice.jl")
 include("union_find.jl")
+
+using MCObservables
+
+square(x) = x*x
 
 type Cluster
   spin :: Int
   size :: Int
 end
 
-function update!(spins::AbstractArray{Int}, p::Real)
+type Ising_SW
+  lat :: Lattice
+  T :: Float64
+  beta :: Float64
+  p :: Float64
+  spins :: Vector{Int}
+  clusters :: Vector{Cluster}
+
+  function Ising_SW(lat::Lattice, T::Real)
+    model = new()
+    model.lat = lat
+    model.T = T
+    model.beta = 1.0/T
+    model.p = -expm1(-2model.beta)
+    model.spins = rand([1,-1], num_sites(lat))
+    return model
+  end
+end
+
+function update!(model::Ising_SW)
   uf = UnionFind(nsites)
-  for bond in 1:nbonds
+  @inbounds for bond in 1:nbonds
     s1,s2 = source(lat, bond), target(lat, bond)
     if spins[s1] == spins[s2] && rand() < p
       unify(uf, s1,s2)
     end
   end
   nc = clusterize!(uf)
-  clusters = Vector{Cluster}(nc)
-  for cl in clusters
-    cl.size = 0
-    cl.spin = rand([1,-1])
-  end
-  for site in 1:nsites
+  clusters = Cluster[ Cluster(rand([1,-1]), 0) for i in 1:nc]
+  @inbounds for site in 1:nsites
     id = cluster_id(uf, site)
     cl = clusters[id]
     spins[site] = cl.spin
     cl.size += 1
   end
-  return clusters
+  model.clusters = clusters
+  return nothing
 end
 
-function ising_SW(lat::Lattice, T::Float64, Sweeps::Int, Thermalization::Int)
-  nsites = num_sites(lat)
-  nbonds = num_bonds(lat)
-  spins = ones(Int,nsites)
-
-  p = 1.0-exp(-2.0/T)
-
-  obs = ObservableSet()
-  add(obs,"Magnetization")
-  add(obs,"Magnetization^2")
-  add(obs,"Magnetization^4")
-  add(obs,"Energy")
-  add(obs,"Energy^2")
-
-  function measure(clusters)
-    m2 = 0.0
-    m4 = 0.0
-
-    for i in 1:length(clusters)
-      c2 = square(clusters[i].size)
-      m4 += square(mi)
-      m4 += 6.0 * c2 * m2
-      m2 += mi
-    end
-
-    add(obs["Magnetization"], 0.0)
-    add(obs["Magnetization^2"], m2)
-    add(obs["Magnetization^4"], m4)
-    #add(obs["Energy"], en)
-    #add(obs["Energy^2"], square(en))
+function measure!(obs::MCObservable, model::Ising_SW)
+  N = num_sites(model.lat)
+  m2 = 0.0
+  m4 = 0.0
+  for cl in model.clusters
+    c2 = square(cl.size/N)
+    m4 += square(c2)
+    m4 += 6.0 * m2 * c2
+    m2 += c2
   end
+  obs["Magnetization"] << 0.0
+  obs["Magnetization^2"] << m2
+  obs["Magnetization^4"] << m4
+end
+
+function ising_SW(lat::Lattice; T::Real=1.0, Sweeps::Int=8192, Thermalization::Int=Sweeps>>3)
+  model = Ising_SW(lat, T)
+
+  obs = BinningObservableSet()
+  makeMCObservable(obs, "Magnetization")
+  makeMCObservable(obs, "Magnetization^2")
+  makeMCObservable(obs, "Magnetization^4")
 
   for mcs in 1:Thermalization
-    update()
+    update!(model)
   end
   for mcs in 1:Sweeps
-    measure(update())
+    update!(model)
+    measure!(obs, model)
   end
+
+  jk_obj = jackknife(obs)
+  jk_obj["Binder"] = jk_obj["Magnetization^4"] / (jk_obj["Magnetization^2"]^2)
 
   return obs
-end
-
-L = 16
-lat = square_lattice(L)
-Sweeps = 8192
-Thermalization = Sweeps>>3
-
-for T in 2.0:0.1:2.4
-  observables = ising_SW(lat, T, Sweeps, Thermalization)
-  for obs in observables
-    open("$(obs[1])_$L.dat", "a") do os
-      write(os, "$T $(mean(obs[2])) $(error(obs[2]))\n")
-    end
-  end
 end
 

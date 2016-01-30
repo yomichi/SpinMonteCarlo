@@ -1,5 +1,7 @@
-include("SpinMonteCarlo.jl")
-using SpinMonteCarlo
+include("lattice.jl")
+include("union_find.jl")
+
+using MCObservables
 
 square(x) = x*x
 
@@ -52,23 +54,23 @@ function measure!(obs, model)
   nbonds = num_bonds(model.lat)
   m = model.mag/nsites
   en = model.ene/nbonds
-  add!(obs["Magnetization"], m)
-  add!(obs["Magnetization^2"], square(m))
-  add!(obs["Magnetization^4"], square(square(m)))
-  add!(obs["Energy"], en)
-  add!(obs["Energy^2"], square(en))
+  obs["Magnetization"] << m
+  obs["Magnetization^2"] << square(m)
+  obs["Magnetization^4"] << square(square(m))
+  obs["Energy"] << en
+  obs["Energy^2"] << square(en)
 end
 
 function ising_localupdate(L::Int, T::Float64, h::Float64, Sweeps::Int, Thermalization::Int; initial::Symbol = :up)
 
   model = Ising(L, T, h, initial)
 
-  obs = ObservableSet()
-  add!(obs,"Magnetization")
-  add!(obs,"Magnetization^2")
-  add!(obs,"Magnetization^4")
-  add!(obs,"Energy")
-  add!(obs,"Energy^2")
+  obs = BinningObservableSet()
+  makeMCObservable(obs, "Magnetization")
+  makeMCObservable(obs, "Magnetization^2")
+  makeMCObservable(obs, "Magnetization^4")
+  makeMCObservable(obs, "Energy")
+  makeMCObservable(obs, "Energy^2")
 
   for mcs in 1:Thermalization
     update!(model)
@@ -78,6 +80,9 @@ function ising_localupdate(L::Int, T::Float64, h::Float64, Sweeps::Int, Thermali
     measure!(obs, model)
   end
 
-  return obs
+  jk_obs = jackknife(obs)
+  jk_obs["Binning"] = jk_obs["Magnetization^4"]/(jk_obs["Magnetization^2"]^2)
+
+  return jk_obs
 end
 

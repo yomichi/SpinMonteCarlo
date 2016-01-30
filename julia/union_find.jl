@@ -29,22 +29,24 @@ function unify!(u::UnionFind, n1::Integer, n2::Integer)
     u.nclusters -= 1
     if w1<w2
       u.parents[r1] = r2
+      return r2
     elseif w1 == w2
       u.parents[r2] = r1
       u.weights[r1]+=1
     else
       u.parents[r2] = r1
     end
-  else
-    return r1
   end
+  return r1
 end
 
 function add_node!(u::UnionFind) 
   push!(u.parents,length(u.parents)+1)
   push!(u.weights,1)
+  push!(u.ids, 0)
   u.nclusters += 1
   u.nnodes += 1
+  return u.nnodes
 end
 
 function clusterize!(u::UnionFind)
